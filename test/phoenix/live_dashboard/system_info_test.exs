@@ -99,7 +99,7 @@ defmodule Phoenix.LiveDashboard.SystemInfoTest do
             {:erlang, :apply, 2}
         end
 
-      assert info[:initial_call] in expected
+      assert info[:initial_call] == expected
 
       pid = Process.whereis(Phoenix.LiveDashboard.DynamicSupervisor)
       {:ok, info} = SystemInfo.fetch_process_info(pid)
@@ -206,23 +206,12 @@ defmodule Phoenix.LiveDashboard.SystemInfoTest do
       socket = open_socket()
       {:ok, {_address, port}} = :inet.sockname(socket)
 
-      {sockets, _count} =
-        SystemInfo.fetch_sockets(node(), Integer.to_string(port), :send_oct, :asc, 100)
+      assert {[found], _count} =
+               SystemInfo.fetch_sockets(node(), ":#{port}", :send_oct, :asc, 100)
 
-      socket =
-        if String.to_integer(System.otp_release()) >= 28 do
-          assert {[socket, _other], _count} =
-                   SystemInfo.fetch_sockets(node(), "*:*", :send_oct, :asc, 100)
+      assert found[:local_address] == "localhost:#{port}"
+      assert found[:foreign_address] == "*:*"
 
-          socket
-        else
-          assert {[socket], _count} =
-                   SystemInfo.fetch_sockets(node(), "*:*", :send_oct, :asc, 100)
-
-          socket
-        end
-
-      assert socket[:foreign_address] == "*:*"
       {sockets, _count} = SystemInfo.fetch_sockets(node(), "impossible", :send_oct, :asc, 100)
       assert Enum.empty?(sockets)
     end
