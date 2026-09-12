@@ -649,3 +649,121 @@ describe("refresh interval", () => {
     expect(mockSetData).not.toBeCalled()
   })
 })
+
+describe('Summary percentiles', () => {
+  const summaryChart = (options = {}) =>
+    new TelemetryChart(document.body, { metric: 'summary', tagged: false, label: "Duration", percentiles: "50,95", ...options })
+
+  test('parses fractional percentiles as separate keys', () => {
+    const chart = summaryChart({ percentiles: "50,99.9" })
+
+    expect(chart.metric.percentiles).toEqual([50, 99.9])
+
+    chart.pushData([
+      { x: 'a', y: 1, z: 1 },
+      { x: 'b', y: 2, z: 2 },
+      { x: 'c', y: 3, z: 3 },
+      { x: 'd', y: 4, z: 4 }
+    ])
+
+    const { percentiles } = chart.metric.datasets[1].agg
+    expect(Object.keys(percentiles)).toEqual(["50", "99.9"])
+    expect(percentiles[50]).toEqual([1, 1.5, 2, 2.5])
+    expect(percentiles[99.9]).toEqual([1, expect.closeTo(1.999, 10), expect.closeTo(2.998, 10), expect.closeTo(3.997, 10)])
+  })
+
+  test('interpolates linearly between the two closest ranks of the retained values', () => {
+    const chart = summaryChart()
+
+    chart.pushData([
+      { x: 'a', y: 30, z: 1 },
+      { x: 'b', y: 10, z: 2 },
+      { x: 'c', y: 40, z: 3 },
+      { x: 'd', y: 20, z: 4 }
+    ])
+
+    const dataset = chart.metric.datasets[1]
+
+    // The raw series keeps its insertion order; sorting happens on a copy
+    expect(dataset.data).toEqual([30, 10, 40, 20])
+
+    // Sorted values after each point: [30], [10, 30], [10, 30, 40], [10, 20, 30, 40]
+    expect(dataset.agg.percentiles[50]).toEqual([30, 20, 30, 25])
+    expect(dataset.agg.percentiles[95]).toEqual([30, expect.closeTo(29, 10), expect.closeTo(39, 10), expect.closeTo(38.5, 10)])
+  })
+
+  test('exposes percentiles in the legend values', () => {
+    const chart = summaryChart()
+
+    chart.pushData([
+      { x: 'a', y: 10, z: 1 },
+      { x: 'b', y: 20, z: 2 }
+    ])
+
+    expect(chart.metric.__seriesValues(null, 1, 1)).toEqual({
+      Value: "20.000", Min: "10.000", Max: "20.000", Avg: "15.000", P50: "15.000", P95: "19.500"
+    })
+
+    // No point at this index
+    expect(chart.metric.__seriesValues(null, 1, 2)).toEqual({
+      Value: "--", Min: "--", Max: "--", Avg: "--", P50: "--", P95: "--"
+    })
+  })
+
+  describe('with tags', () => {
+    const taggedChart = (options = {}) =>
+      new TelemetryChart(document.body, { metric: 'summary', tagged: true, percentiles: "50", ...options })
+
+    test('aligns percentiles by tag and fills gaps with null', () => {
+      const chart = taggedChart()
+
+      chart.pushData([{ x: 'a', y: 2, z: 1 }])
+      chart.pushData([{ x: 'b', y: 4, z: 3 }])
+      chart.pushData([{ x: 'a', y: 6, z: 5 }])
+
+      const [, a, b] = chart.metric.datasets
+
+      expect(a.key).toEqual("a")
+      expect(a.data).toEqual([2, null, 6])
+      expect(a.agg.percentiles[50]).toEqual([2, null, 4])
+
+      expect(b.key).toEqual("b")
+      expect(b.data).toEqual([null, 4, null])
+      expect(b.agg.percentiles[50]).toEqual([null, 4, null])
+
+      // Legend values for a tick where the tag had no measurement
+      expect(chart.metric.__seriesValues(null, 2, 0)).toEqual({
+        Value: "--", Min: "--", Max: "--", Avg: "--", P50: "--"
+      })
+    })
+
+    test('prunes percentiles together with the data', () => {
+      const chart = taggedChart({ pruneThreshold: 3 })
+
+      chart.pushData([
+        { x: 'a', y: 1, z: 1 },
+        { x: 'b', y: 2, z: 2 },
+        { x: 'a', y: 3, z: 3 }
+      ])
+
+      // Overflow the threshold: every series is trimmed to the last 3 points
+      chart.pushData([{ x: 'a', y: 5, z: 4 }])
+
+      let [x, a, b] = chart.metric.datasets
+      expect(x.data).toEqual([2, 3, 4])
+      expect(a.data).toEqual([null, 3, 5])
+      expect(a.agg.percentiles[50]).toEqual([null, 2, 3])
+      expect(b.data).toEqual([2, null, null])
+      expect(b.agg.percentiles[50]).toEqual([2, null, null])
+
+      // Later percentiles only see the retained values ([3, 5, 7] -> 5),
+      // while the average stays cumulative ((1 + 3 + 5 + 7) / 4 -> 4)
+      chart.pushData([{ x: 'a', y: 7, z: 5 }])
+
+      ;[x, a, b] = chart.metric.datasets
+      expect(a.data).toEqual([3, 5, 7])
+      expect(a.agg.percentiles[50]).toEqual([2, 3, 5])
+      expect(a.agg.avg).toEqual([2, 3, 4])
+    })
+  })
+})

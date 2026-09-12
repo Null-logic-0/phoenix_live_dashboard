@@ -102,9 +102,10 @@ function nextValueForCallback({ y, z }, callback) {
 
 const findLastNonNullValue = (data) => data.reduceRight((a, c) => (c != null && a == null ? c : a), null)
 
-const getPercentile = (data, percentile) => {
-  if (data.length === 0) return null
-  const sorted = data.slice().sort((a, b) => a - b)
+// Percentile of an ascending sorted array, interpolating linearly between
+// the two closest ranks (the same definition as NumPy's default method)
+const percentileOfSorted = (sorted, percentile) => {
+  if (sorted.length === 0) return null
   const index = (percentile / 100) * (sorted.length - 1)
   const lower = Math.floor(index)
   const upper = Math.ceil(index)
@@ -216,7 +217,7 @@ class CommonMetric {
 class Summary {
   constructor(options, chartEl) {
     const percentilesString = options.percentiles || ""
-    this.percentiles = percentilesString ? percentilesString.split(",").map(p => parseInt(p)) : []
+    this.percentiles = percentilesString ? percentilesString.split(",").map(Number) : []
 
     let config = this.constructor.getConfig(options)
     // Bind the series `values` callback to this instance
@@ -308,10 +309,13 @@ class Summary {
 
     dataset.agg.avg.push((dataset.agg.total / dataset.agg.count))
 
-    const nonNullData = dataset.data.filter(v => v !== null)
-    this.percentiles.forEach(p => {
-      dataset.agg.percentiles[p].push(getPercentile(nonNullData, p))
-    })
+    if (this.percentiles.length > 0) {
+      // Sort once per measurement and share the result across all percentiles
+      const sorted = dataset.data.filter(v => v !== null).sort((a, b) => a - b)
+      this.percentiles.forEach(p => {
+        dataset.agg.percentiles[p].push(percentileOfSorted(sorted, p))
+      })
+    }
 
     return dataset
   }

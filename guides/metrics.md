@@ -134,7 +134,7 @@ The following table shows how `Telemetry.Metrics` metrics map to LiveDashboard c
 | `last_value`      | Always set to an absolute value                            |
 | `counter`         | Always increased by 1                                      |
 | `sum`             | Always increased/decreased by an absolute value            |
-| `summary`         | Value/Min/Max/Avg                                          |
+| `summary`         | Value/Min/Max/Avg and optional percentiles                 |
 | `distribution`    | Total number of events in individual buckets               |
 
 ### Reporter options
@@ -156,6 +156,12 @@ The following reporter options are available to the dashboard:
 
   * `:bucket_size` - the unit width of each bucket. This option only
     applies to `distribution` histograms. The default value is `20`.
+
+  * `:percentiles` - a list of percentiles to show in the chart legend
+    next to Value/Min/Max/Avg, for example `[50, 95, 99]`. Each entry
+    must be a number between `0` and `100`. Percentiles are computed over
+    the data points currently kept by the chart. This option only applies
+    to `summary` metrics and is disabled by default.
 
 ### Metrics history
 

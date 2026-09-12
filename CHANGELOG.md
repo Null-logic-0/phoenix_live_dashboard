@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Add a compact nested list view for application supervision trees
+* Add `:percentiles` reporter option for summary metrics
 
 ## v0.8.7 (2025-04-28)
 

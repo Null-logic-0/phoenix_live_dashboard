@@ -117,6 +117,28 @@ defmodule Phoenix.LiveDashboard.ChartComponentTest do
       end
     end
 
+    test "percentiles" do
+      msg = ":percentiles must be a list of numbers between 0 and 100, got: 95"
+
+      assert_raise ArgumentError, msg, fn ->
+        render_chart(percentiles: 95)
+      end
+
+      msg = ":percentiles must be a list of numbers between 0 and 100, got: [50, 101]"
+
+      assert_raise ArgumentError, msg, fn ->
+        render_chart(percentiles: [50, 101])
+      end
+
+      msg = ~s(:percentiles must be a list of numbers between 0 and 100, got: [50, "95"])
+
+      assert_raise ArgumentError, msg, fn ->
+        render_chart(percentiles: [50, "95"])
+      end
+
+      assert render_chart(percentiles: [0, 99.9, 100]) =~ ~s|data-percentiles="0,99.9,100"|
+    end
+
     test "prune_threshold" do
       msg = ":prune_threshold must be a positive integer, got: -1"
 

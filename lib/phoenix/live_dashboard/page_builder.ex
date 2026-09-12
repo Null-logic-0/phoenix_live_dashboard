@@ -958,7 +958,10 @@ defmodule Phoenix.LiveDashboard.PageBuilder do
   attr :bucket_size, :integer,
     doc: "Bucket size for histogram. Default: 20 when `kind = :histogram`, otherwise `nil`."
 
-  attr :percentiles, :list, default: nil, doc: "Optional list of percentiles for summary metrics."
+  attr :percentiles, :list,
+    default: nil,
+    doc:
+      "Percentiles to show in the legend, as numbers between 0 and 100. Only used when `kind = :summary`."
 
   attr :full_width, :boolean, default: false, doc: "Size of the chart"
 

@@ -17,6 +17,7 @@ defmodule Phoenix.LiveDashboard.ChartComponent do
     validate_positive_integer_or_nil!(assigns[:bucket_size], :bucket_size)
     validate_positive_integer_or_nil!(assigns[:prune_threshold], :prune_threshold)
     validate_positive_integer_or_nil!(assigns[:refresh_interval], :refresh_interval)
+    validate_percentiles_or_nil!(assigns[:percentiles])
     :ok
   end
 
@@ -29,6 +30,19 @@ defmodule Phoenix.LiveDashboard.ChartComponent do
 
     value
   end
+
+  defp validate_percentiles_or_nil!(nil), do: nil
+
+  defp validate_percentiles_or_nil!(value) do
+    unless is_list(value) and Enum.all?(value, &percentile?/1) do
+      raise ArgumentError,
+            ":percentiles must be a list of numbers between 0 and 100, got: #{inspect(value, charlists: :as_lists)}"
+    end
+
+    value
+  end
+
+  defp percentile?(value), do: is_number(value) and value >= 0 and value <= 100
 
   @impl true
   def render(assigns) do
